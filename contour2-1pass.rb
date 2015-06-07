@@ -56,6 +56,7 @@ size = CvSize.new((out.cols/postit_length).round, (out.rows/postit_length).round
 out = out.resize(size)
 out.save_image("maze-scaled.jpg")
 cvmat.save_image("output-inter.jpg")
+exit
 
 puts "Calculating matrix...\n"
 matrix = Array.new(out.rows * out.cols)
@@ -97,7 +98,7 @@ work do
 	sleep 7
 	sphero.finish_calibration
 
-	(1..steps.size-1).each {|i|
+	(1..steps.size-1).each{|i|
 		dx = steps[i][0] - steps[i-1][0]
 		#dy = steps[i][1] - steps[i-1][1]
 		dy = steps[i-1][1] - steps[i][1]
@@ -108,8 +109,6 @@ work do
 		sphero.roll speed, degree
 		sleep 0.25
 	}
-
-  exit
 end
 
 cvmat.save_image("output.jpg")

@@ -33,17 +33,13 @@ bin = gray.threshold(128, 255, :binary)
 
 contour = bin.find_contours(:mode => OpenCV::CV_RETR_EXTERNAL, :method => OpenCV::CV_CHAIN_APPROX_SIMPLE)
 cindex=1
-min_area = 1000000
 while contour
-  if contour && !contour.hole? && contour.contour_area > 20000 then
+  if contour && !contour.hole? && contour.contour_area > 15000 then
   	#puts "Contour ##{cindex} is #{contour.contour_area} px^2 (width: #{contour.bounding_rect.width}, height: #{contour.bounding_rect.height}, type: #{(contour.hole?)?"hole":"contour"})"
   	#puts "#{contour.bounding_rect.x}"
     poly = contour.approx(:accuracy => 1)
     cvmat = cvmat.draw_contours(poly, CvColor::Blue, CvColor::Red, 0, :thickness => 5, :line_type => :aa)
     out = out.draw_contours(poly, CvColor::White, CvColor::White, 0, :thickness => -1, :line_type => :aa)
-    if contour.contour_area < min_area then
-      min_area = contour.contour_area
-    end
   end
 
   cindex += 1
@@ -51,11 +47,26 @@ while contour
 end 
 
 puts "Resizing maze and calculating distances...\n"
+size = CvSize.new(135, 100);
+out = out.resize(size)
+cindex=1
+min_area = 1000000
+contour2 = out.find_contours(:mode => OpenCV::CV_RETR_EXTERNAL, :method => OpenCV::CV_CHAIN_APPROX_SIMPLE)
+while contour2
+  if contour2 && !contour2.hole? && contour2.contour_area > 10 then
+  	if contour2.contour_area < min_area then
+  		min_area = contour2.contour_area
+  	end
+  end
+  cindex += 1
+  contour2 = contour2.h_next
+end
 postit_length = Math.sqrt(min_area).round
-size = CvSize.new((out.cols/postit_length).round, (out.rows/postit_length).round);
+size = CvSize.new((135/postit_length).round, (100/postit_length).round);
 out = out.resize(size)
 out.save_image("maze-scaled.jpg")
 cvmat.save_image("output-inter.jpg")
+exit
 
 puts "Calculating matrix...\n"
 matrix = Array.new(out.rows * out.cols)
@@ -65,8 +76,8 @@ matrix = Array.new(out.rows * out.cols)
 end
 
 puts "Finding route...\n"
-start       = { 'x' => 5, 'y' => 15 }
-destination = { 'x' => 11, 'y' => 6 }
+start       = { 'x' => 7, 'y' => 19 }
+destination = { 'x' => 28, 'y' => 13}
 pathfinder  = Astar.new(start, destination, matrix, out.cols, out.rows)
 result      = pathfinder.search
 
@@ -74,7 +85,8 @@ if (result.size > 0)
   i = 0
   steps = Array.new(result.size)
   result.each {|node|
-    out[node.x()+node.y()*(100/postit_length).round] = CvColor::White
+    #puts "#{node.x()} #{node.y()}\n"
+    out[node.x()+node.y()*(135/postit_length).round] = CvColor::White
     steps[i] = Array.new(2)
     steps[i][0] = node.x()
     steps[i][1] = node.y()
@@ -83,7 +95,7 @@ if (result.size > 0)
 end
 
 puts "Start walking...\n"
-puts steps.to_json
+#puts steps.to_json
 work do
 	rolling = false
 	degree = 0
@@ -97,7 +109,7 @@ work do
 	sleep 7
 	sphero.finish_calibration
 
-	(1..steps.size-1).each {|i|
+	(1..steps.size-1).each{|i|
 		dx = steps[i][0] - steps[i-1][0]
 		#dy = steps[i][1] - steps[i-1][1]
 		dy = steps[i-1][1] - steps[i][1]
@@ -108,10 +120,8 @@ work do
 		sphero.roll speed, degree
 		sleep 0.25
 	}
-
-  exit
 end
 
+puts "Saving maze...\n"
 cvmat.save_image("output.jpg")
 out.save_image("maze.jpg")
-
